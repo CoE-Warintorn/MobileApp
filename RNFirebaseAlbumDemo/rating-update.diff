@@ -1,0 +1,255 @@
+diff --git a/.gitignore b/.gitignore
+index 5d64756..0f62530 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -54,3 +54,6 @@ buck-out/
+ 
+ # Bundle artifact
+ *.jsbundle
++
++# Ignore google-services.json because this is a demo app
++google-services.json
+diff --git a/package.json b/package.json
+index 6f36689..a71f45e 100644
+--- a/package.json
++++ b/package.json
+@@ -10,6 +10,7 @@
+     "react": "16.6.0-alpha.8af6728",
+     "react-native": "0.57.4",
+     "react-native-firebase": "^5.1.0",
++    "react-native-ratings": "^6.0.0",
+     "react-navigation": "^2.18.2"
+   },
+   "devDependencies": {
+diff --git a/screens/AddCommentScreen/CommentForm.js b/screens/AddCommentScreen/CommentForm.js
+index a280da7..9405e90 100644
+--- a/screens/AddCommentScreen/CommentForm.js
++++ b/screens/AddCommentScreen/CommentForm.js
+@@ -5,6 +5,7 @@ import {
+   TextInput,
+   View,
+ } from 'react-native';
++import { Rating } from 'react-native-ratings';
+ 
+ class CommentForm extends React.Component {
+   handleNameChanged = (text) => {
+@@ -17,6 +18,16 @@ class CommentForm extends React.Component {
+     }
+   }
+ 
++  handleRatingChanged = (rating) => {
++    const { comment, onCommentChanged } = this.props;
++    if (typeof onCommentChanged === 'function') {
++      onCommentChanged({
++        ...comment,
++        rating,
++      });
++    }
++  }
++
+   handleCommentChanged = (text) => {
+     const { comment, onCommentChanged } = this.props;
+     if (typeof onCommentChanged === 'function') {
+@@ -29,7 +40,7 @@ class CommentForm extends React.Component {
+ 
+   render() {
+     const {
+-      comment: { name, comment },
++      comment: { name, rating, comment },
+       onAddComment,
+       disabled,
+     } = this.props;
+@@ -41,6 +52,16 @@ class CommentForm extends React.Component {
+           onChangeText={this.handleNameChanged}
+           editable={!disabled}
+         />
++        <View style={styles.ratingWrapper}>
++          <Rating
++            type="star"
++            showRating={true}
++            imageSize={32}
++            fraction={0}
++            startingValue={rating}
++            onFinishRating={this.handleRatingChanged}
++          />
++        </View>
+         <TextInput
+           placeholder="Comment"
+           style={styles.comment}
+@@ -64,10 +85,13 @@ const styles = StyleSheet.create({
+     padding: 16,
+     backgroundColor: 'white',
+   },
++  ratingWrapper: {
++    alignSelf: 'center',
++  },
+   comment: {
+     height: 160,
+     textAlignVertical: 'top',
+   },
+ });
+ 
+-export default CommentForm;
+\ No newline at end of file
++export default CommentForm;
+diff --git a/screens/AddCommentScreen/index.js b/screens/AddCommentScreen/index.js
+index cad070d..61d7405 100644
+--- a/screens/AddCommentScreen/index.js
++++ b/screens/AddCommentScreen/index.js
+@@ -13,6 +13,7 @@ class AddCommentScreen extends React.Component {
+   state = {
+     comment: {
+       name: '',
++      rating: 3,
+       comment: '',
+     },
+     disableForm: false,
+@@ -52,4 +53,4 @@ class AddCommentScreen extends React.Component {
+   }
+ }
+ 
+-export default AddCommentScreen;
+\ No newline at end of file
++export default AddCommentScreen;
+diff --git a/screens/AlbumDetailScreen/AlbumHeader.js b/screens/AlbumDetailScreen/AlbumHeader.js
+index 95f6ffd..0a68f3f 100644
+--- a/screens/AlbumDetailScreen/AlbumHeader.js
++++ b/screens/AlbumDetailScreen/AlbumHeader.js
+@@ -7,6 +7,7 @@ import {
+   Text,
+   View,
+ } from 'react-native';
++import { Rating } from 'react-native-ratings';
+ 
+ class AlbumHeader extends React.Component {
+   handleSeePressed = () => {
+@@ -21,6 +22,7 @@ class AlbumHeader extends React.Component {
+       artist,
+       image,
+       url,
++      avg_rating,
+     } = album;
+ 
+     return (
+@@ -34,6 +36,13 @@ class AlbumHeader extends React.Component {
+           <Text style={styles.title}>{title}</Text>
+           <Text style={styles.artist}>{artist}</Text>
+ 
++          <Rating
++            readonly
++            type="star"
++            imageSize={28}
++            startingValue={typeof avg_rating === 'number' ? avg_rating : 0}
++          />
++
+           <View style={styles.buttonWrapper}>
+             <Button
+               title="See on Amazon"
+@@ -85,4 +94,4 @@ const styles = StyleSheet.create({
+   },
+ });
+ 
+-export default AlbumHeader;
+\ No newline at end of file
++export default AlbumHeader;
+diff --git a/screens/AlbumDetailScreen/CommentEntry.js b/screens/AlbumDetailScreen/CommentEntry.js
+index b52f159..0aea65a 100644
+--- a/screens/AlbumDetailScreen/CommentEntry.js
++++ b/screens/AlbumDetailScreen/CommentEntry.js
+@@ -4,10 +4,22 @@ import {
+   Text,
+   View,
+ } from 'react-native';
++import { Rating } from 'react-native-ratings';
+ 
+ function CommentEntry({ comment }) {
+   return (
+     <View style={styles.container}>
++      {typeof comment.rating === 'number'
++        ? (
++          <Rating
++            readonly
++            type="star"
++            imageSize={20}
++            startingValue={comment.rating}
++          />
++        ) : null
++      }
++
+       <Text style={styles.comment}>{comment.comment}</Text>
+       <Text style={styles.metadata}>
+         <Text style={styles.bold}>From: </Text>
+@@ -39,4 +51,4 @@ const styles = StyleSheet.create({
+   },
+ });
+ 
+-export default CommentEntry;
+\ No newline at end of file
++export default CommentEntry;
+diff --git a/screens/AlbumListScreen/AlbumEntry.js b/screens/AlbumListScreen/AlbumEntry.js
+index 7b83e52..9bdf7af 100644
+--- a/screens/AlbumListScreen/AlbumEntry.js
++++ b/screens/AlbumListScreen/AlbumEntry.js
+@@ -6,6 +6,7 @@ import {
+   TouchableHighlight,
+   View,
+ } from 'react-native';
++import { Rating } from 'react-native-ratings';
+ 
+ class AlbumEntry extends React.Component {
+   handlePressed = () => {
+@@ -21,6 +22,7 @@ class AlbumEntry extends React.Component {
+       title,
+       artist,
+       thumbnail_image,
++      avg_rating,
+     } = album;
+ 
+     return (
+@@ -36,6 +38,12 @@ class AlbumEntry extends React.Component {
+           <View style={styles.textContainer}>
+             <Text style={styles.title}>{title}</Text>
+             <Text style={styles.artist}>{artist}</Text>
++            <Rating
++              readonly
++              type="star"
++              imageSize={20}
++              startingValue={typeof avg_rating === 'number' ? avg_rating : 0}
++            />
+           </View>
+         </View>
+       </TouchableHighlight>
+@@ -72,4 +80,4 @@ const styles = StyleSheet.create({
+   }
+ });
+ 
+-export default AlbumEntry;
+\ No newline at end of file
++export default AlbumEntry;
+diff --git a/yarn.lock b/yarn.lock
+index 479af3e..d079a84 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -4228,7 +4228,7 @@ prompts@^0.1.9:
+     kleur "^2.0.1"
+     sisteransi "^0.1.1"
+ 
+-prop-types@^15.5.8, prop-types@^15.6.0, prop-types@^15.6.1, prop-types@^15.6.2:
++prop-types@^15.5.10, prop-types@^15.5.8, prop-types@^15.6.0, prop-types@^15.6.1, prop-types@^15.6.2:
+   version "15.6.2"
+   resolved "https://registry.yarnpkg.com/prop-types/-/prop-types-15.6.2.tgz#05d5ca77b4453e985d60fc7ff8c859094a497102"
+   dependencies:
+@@ -4335,6 +4335,13 @@ react-native-firebase@^5.1.0:
+   dependencies:
+     opencollective-postinstall "^2.0.0"
+     prop-types "^15.6.2"
++react-native-ratings@^6.0.0:
++  version "6.0.0"
++  resolved "https://registry.yarnpkg.com/react-native-ratings/-/react-native-ratings-6.0.0.tgz#8083c4955c14aef0751abb7f5ba6c48ae8b2189b"
++  integrity sha512-65gbGrtR+Y+/bEWxZGbNmYP1CL/3FerNFLQXWCuoYS0Gzn7HqMuSS3HObYjHX4jlRH9KKjIjhP/q59N7AwgAiA==
++  dependencies:
++    lodash "^4.17.4"
++    prop-types "^15.5.10"
+ 
+ react-native-safe-area-view@0.11.0:
+   version "0.11.0"
